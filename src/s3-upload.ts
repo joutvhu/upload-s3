@@ -1,26 +1,53 @@
 import * as aws from 'aws-sdk';
 import * as core from '@actions/core';
-import {getInputs, S3Inputs, setOutputs} from './io-helper';
+import {getInputs, isBlank, S3Inputs, setOutputs} from './io-helper';
 import fs from 'fs';
 import path from 'path';
 import {lookup} from 'mime-types';
 import {ManagedUpload} from 'aws-sdk/lib/s3/managed_upload';
 
-function getFiles(dir: string, files: string[] = []): string[] {
-  const fileList: string[] = fs.readdirSync(dir)
-  for (const file of fileList) {
-    const name = path.join(dir.endsWith('/') ? dir : dir + '/', file);
-    if (fs.statSync(name).isDirectory()) {
-      getFiles(name, files);
-    } else {
-      files.push(name);
-    }
-  }
-  return files
-}
-
 interface UploadError {
   Error?: Error;
+}
+
+function getFiles(source: string, files: string[] = []): string[] {
+  if (fs.statSync(source).isFile()) {
+    files.push(source);
+  } else {
+    const findFiles = (dir: string) => {
+      const fileList: string[] = fs.readdirSync(dir)
+      for (const file of fileList) {
+        const name = path.join(dir.endsWith('/') ? dir : dir + '/', file);
+        if (fs.statSync(name).isDirectory()) {
+          findFiles(name);
+        } else {
+          files.push(name);
+        }
+      }
+    };
+    findFiles(source);
+  }
+  return files;
+}
+
+function basename(source: string, file: string) {
+  const f = path.relative(source, file);
+  return isBlank(f) ? path.basename(file) : f;
+}
+
+function count(results: (ManagedUpload.SendData | UploadError)[]) {
+  const outputs: any = {
+    succeeded: 0,
+    failed: 0
+  };
+  for (const result of results) {
+    if ('Key' in result && result.Key != null) {
+      outputs.succeeded++;
+    } else {
+      outputs.failed++;
+    }
+  }
+  return outputs;
 }
 
 (async function run() {
@@ -37,12 +64,12 @@ interface UploadError {
     const s3 = new aws.S3({signatureVersion: 'v4'});
 
     const files = getFiles(inputs.source);
-    const p: Promise<ManagedUpload.SendData | UploadError>[] = [];
+    const requests: Promise<ManagedUpload.SendData | UploadError>[] = [];
     for (const file of files) {
-      const f = path.relative(inputs.source, file);
-      const key = path.join(inputs.target, f);
+      const name = basename(inputs.source, file);
+      const key = path.join(inputs.target, name);
       const contentType = lookup(file) || 'text/plain';
-      const u = s3.upload({
+      const request = s3.upload({
         Bucket: inputs.awsBucket,
         Key: key,
         Body: fs.readFileSync(file),
@@ -60,26 +87,17 @@ interface UploadError {
             Error: reason
           };
         });
-      p.push(u);
+      requests.push(request);
     }
 
-    const outputs: any = {
-      succeeded: 0,
-      failed: 0
-    };
-    const results = await Promise.all(p);
-    for (const r of results) {
-      if ('Key' in r && r.Key != null) {
-        outputs.succeeded++;
-      } else {
-        outputs.failed++;
-      }
-    }
-    core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`)
-    if (inputs.throwing && outputs.failed > 0) {
+    const results = await Promise.all(requests);
+    const outputs = count(results);
+    setOutputs(outputs);
+
+    core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`);
+    if (inputs.ignoreError != true && outputs.failed > 0) {
       throw new Error(`Upload ${outputs.failed} files failed`);
     }
-    setOutputs(outputs);
   } catch (err: any) {
     core.debug(`Error status: ${err.status}`);
     core.setFailed(err.message);

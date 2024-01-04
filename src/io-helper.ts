@@ -12,7 +12,7 @@ export interface S3Inputs {
   target: string;
   acl?: ObjectCannedACL;
   expires?: Expires;
-  throwing?: boolean;
+  ignoreError?: boolean;
 }
 
 export function isBlank(value: any): boolean {
@@ -56,6 +56,8 @@ export function getInputs(): S3Inputs {
       result.expires = undefined;
     }
   }
+
+  result.ignoreError = getBooleanInput(Inputs.IgnoreError, {required: false});
 
   return result;
 }

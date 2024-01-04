@@ -15,20 +15,22 @@ inputs:
     description: The bucket name to which the PUT action was initiated.
     required: true
   source:
-    description: ''
+    description: The local directory (or file) you wish to upload to S3.
     required: true
   target:
-    description: ''
+    description: Directory on the bucket to upload files.
     required: true
   acl:
     description: The canned ACL to apply to the object
-    required: true
+    required: false
+    default: private
   expires:
     description: The date and time at which the object is no longer cacheable.
-    required: true
-  throwing:
-    description: ''
     required: false
+  ignore_error:
+    description: Should failed uploads be ignored
+    required: false
+    default: 'true'
 outputs:
   succeeded:
     description: Number of successful files

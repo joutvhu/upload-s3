@@ -6,7 +6,8 @@ export enum Inputs {
   Source = 'source',
   Target = 'target',
   Acl = 'acl',
-  Expires = 'expires'
+  Expires = 'expires',
+  IgnoreError = 'ignore_error'
 }
 
 export enum Outputs {
