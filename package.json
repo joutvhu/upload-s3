@@ -1,7 +1,7 @@
 {
   "name": "s3-upload",
   "version": "1.0.0",
-  "description": "This GitHub action is used to upload files to Amazon S3",
+  "description": "GitHub action to upload files to Amazon S3",
   "scripts": {
     "build": "npm run clean && tsc --project tsconfig.json",
     "release": "ncc build src/s3-upload.ts -o action && git add -f action/",
@@ -11,8 +11,9 @@
   "keywords": [
     "Actions",
     "GitHub",
-    "Artifacts",
-    "Delete"
+    "AWS",
+    "S3",
+    "Upload"
   ],
   "author": {
     "name": "Giao Ho",

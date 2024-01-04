@@ -1,5 +1,5 @@
 name: S3 Upload
-description: This GitHub action is used to upload files to Amazon S3
+description: GitHub action to upload files to Amazon S3
 author: Giao Ho
 inputs:
   aws_access_key_id:
