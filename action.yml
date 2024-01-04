@@ -1,0 +1,37 @@
+name: S3 Upload
+description: This GitHub action is used to upload files to Amazon S3
+author: Giao Ho
+inputs:
+  aws_access_key_id:
+    description: ''
+    required: true
+  aws_secret_access_key:
+    description: ''
+    required: true
+  aws_region:
+    description: ''
+    required: true
+  aws_bucket:
+    description: ''
+    required: true
+  source:
+    description: ''
+    required: true
+  target:
+    description: ''
+    required: true
+  acl:
+    description: ''
+    required: true
+  expires:
+    description: ''
+    required: true
+  throwing:
+    description: ''
+    required: false
+runs:
+  using: node20
+  main: action/index.js
+branding:
+  icon: upload-cloud
+  color: red
