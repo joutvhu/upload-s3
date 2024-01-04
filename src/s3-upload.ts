@@ -75,6 +75,10 @@ interface UploadError {
         outputs.failed++;
       }
     }
+    core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`)
+    if (inputs.throwing && outputs.failed > 0) {
+      throw new Error(`Upload ${outputs.failed} files failed`);
+    }
     setOutputs(outputs);
   } catch (err: any) {
     core.debug(`Error status: ${err.status}`);

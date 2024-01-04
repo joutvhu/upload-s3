@@ -12,6 +12,7 @@ export interface S3Inputs {
   target: string;
   acl?: ObjectCannedACL;
   expires?: Expires;
+  throwing?: boolean;
 }
 
 export function isBlank(value: any): boolean {

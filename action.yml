@@ -3,16 +3,16 @@ description: This GitHub action is used to upload files to Amazon S3
 author: Giao Ho
 inputs:
   aws_access_key_id:
-    description: ''
+    description: AWS access key ID.
     required: true
   aws_secret_access_key:
-    description: ''
+    description: AWS secret access key.
     required: true
   aws_region:
-    description: ''
+    description: The region to send service requests to.
     required: true
   aws_bucket:
-    description: ''
+    description: The bucket name to which the PUT action was initiated.
     required: true
   source:
     description: ''
@@ -21,14 +21,19 @@ inputs:
     description: ''
     required: true
   acl:
-    description: ''
+    description: The canned ACL to apply to the object
     required: true
   expires:
-    description: ''
+    description: The date and time at which the object is no longer cacheable.
     required: true
   throwing:
     description: ''
     required: false
+outputs:
+  succeeded:
+    description: Number of successful files
+  failed:
+    description: Number of failed files
 runs:
   using: node20
   main: action/index.js
