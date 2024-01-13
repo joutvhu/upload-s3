@@ -7,6 +7,7 @@ export enum Inputs {
   Target = 'target',
   Acl = 'acl',
   Expires = 'expires',
+  Delete = 'delete',
   IgnoreError = 'ignore_error'
 }
 

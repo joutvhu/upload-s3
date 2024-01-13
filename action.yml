@@ -18,14 +18,18 @@ inputs:
     description: The local directory (or file) you wish to upload to S3.
     required: true
   target:
-    description: Directory on the bucket to upload files.
+    description: The directory (or file path) on the bucket to upload files.
     required: true
+    default: ''
   acl:
     description: The canned ACL to apply to the object
     required: false
     default: private
   expires:
     description: The date and time at which the object is no longer cacheable.
+    required: false
+  delete:
+    description: Delete files not present at local.
     required: false
   ignore_error:
     description: Should failed uploads be ignored

@@ -12,6 +12,7 @@ export interface S3Inputs {
   target: string;
   acl?: ObjectCannedACL;
   expires?: Expires;
+  delete?: boolean;
   ignoreError?: boolean;
 }
 
@@ -56,6 +57,8 @@ export function getInputs(): S3Inputs {
       result.expires = undefined;
     }
   }
+
+  result.delete = getBooleanInput(Inputs.Delete, {required: false});
 
   result.ignoreError = getBooleanInput(Inputs.IgnoreError, {required: false});
 

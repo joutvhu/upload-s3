@@ -1,10 +1,11 @@
 import * as aws from 'aws-sdk';
 import * as core from '@actions/core';
-import {getInputs, isBlank, S3Inputs, setOutputs} from './io-helper';
+import {getInputs, S3Inputs, setOutputs} from './io-helper';
 import fs from 'fs';
 import path from 'path';
 import {lookup} from 'mime-types';
 import {ManagedUpload} from 'aws-sdk/lib/s3/managed_upload';
+import {ObjectIdentifierList} from 'aws-sdk/clients/s3';
 
 interface UploadError {
   Error?: Error;
@@ -28,11 +29,6 @@ function getFiles(source: string, files: string[] = []): string[] {
     findFiles(source);
   }
   return files;
-}
-
-function basename(source: string, file: string) {
-  const f = path.relative(source, file);
-  return isBlank(f) ? path.basename(file) : f;
 }
 
 function count(results: (ManagedUpload.SendData | UploadError)[]) {
@@ -63,12 +59,14 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
     });
     const s3 = new aws.S3({signatureVersion: 'v4'});
 
+    const keys: string[] = [];
     const files = getFiles(inputs.source);
     const requests: Promise<ManagedUpload.SendData | UploadError>[] = [];
     for (const file of files) {
-      const name = basename(inputs.source, file);
+      const name = path.relative(inputs.source, file);
       const key = path.join(inputs.target, name);
       const contentType = lookup(file) || 'text/plain';
+      keys.push(key);
       const request = s3.upload({
         Bucket: inputs.awsBucket,
         Key: key,
@@ -92,6 +90,34 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
 
     const results = await Promise.all(requests);
     const outputs = count(results);
+
+    if (inputs.delete === true) {
+      const objects = await s3.listObjectsV2({
+        Bucket: inputs.awsBucket,
+        Prefix: inputs.target
+      }).promise();
+      const deleteObjects: ObjectIdentifierList = [];
+      for (const content of objects.Contents ?? []) {
+        if (content.Key != null && !keys.includes(content.Key)) {
+          deleteObjects.push({
+            Key: content.Key
+          });
+        }
+      }
+      const deleteResult = await s3.deleteObjects({
+        Bucket: inputs.awsBucket,
+        Delete: {
+          Objects: deleteObjects
+        }
+      }).promise();
+      for (const value of deleteResult.Deleted ?? []) {
+        core.info(`Deleted ${value.Key}`);
+      }
+      for (const value of deleteResult.Errors ?? []) {
+        core.info(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
+      }
+    }
+
     setOutputs(outputs);
 
     core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`);
