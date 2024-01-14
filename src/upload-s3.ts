@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import {lookup} from 'mime-types';
 import {ManagedUpload} from 'aws-sdk/lib/s3/managed_upload';
-import {ObjectIdentifierList} from 'aws-sdk/clients/s3';
+import {ListObjectsV2Output, ObjectIdentifierList, StartAfter} from 'aws-sdk/clients/s3';
 
 interface UploadError {
   Error?: Error;
@@ -92,30 +92,40 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
     const outputs = count(results);
 
     if (inputs.delete === true) {
-      const objects = await s3.listObjectsV2({
-        Bucket: inputs.awsBucket,
-        Prefix: inputs.target
-      }).promise();
-      const deleteObjects: ObjectIdentifierList = [];
-      for (const content of objects.Contents ?? []) {
-        if (content.Key != null && !keys.includes(content.Key)) {
-          deleteObjects.push({
-            Key: content.Key
-          });
+      let startAfter: StartAfter | undefined = undefined;
+      let objects: ListObjectsV2Output | undefined;
+      do {
+        objects = await s3.listObjectsV2({
+          Bucket: inputs.awsBucket,
+          Prefix: inputs.target,
+          StartAfter: startAfter
+        }).promise();
+
+        const deleteObjects: ObjectIdentifierList = [];
+        for (const content of objects.Contents ?? []) {
+          if (content?.Key != null) {
+            startAfter = content.Key;
+            if (!keys.includes(content.Key)) {
+              deleteObjects.push({
+                Key: content.Key
+              });
+            }
+          }
         }
-      }
-      const deleteResult = await s3.deleteObjects({
-        Bucket: inputs.awsBucket,
-        Delete: {
-          Objects: deleteObjects
+
+        const deleteResult = await s3.deleteObjects({
+          Bucket: inputs.awsBucket,
+          Delete: {
+            Objects: deleteObjects
+          }
+        }).promise();
+        for (const value of deleteResult.Deleted ?? []) {
+          core.info(`Deleted ${value.Key}`);
         }
-      }).promise();
-      for (const value of deleteResult.Deleted ?? []) {
-        core.info(`Deleted ${value.Key}`);
-      }
-      for (const value of deleteResult.Errors ?? []) {
-        core.info(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
-      }
+        for (const value of deleteResult.Errors ?? []) {
+          core.info(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
+        }
+      } while (startAfter != null && objects?.MaxKeys != null && objects?.KeyCount === objects?.MaxKeys);
     }
 
     setOutputs(outputs);
