@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import {lookup} from 'mime-types';
 import {ManagedUpload} from 'aws-sdk/lib/s3/managed_upload';
-import {ListObjectsV2Output, ObjectIdentifierList, StartAfter} from 'aws-sdk/clients/s3';
+import {ListObjectsV2Output, ObjectIdentifierList, ObjectList, StartAfter} from 'aws-sdk/clients/s3';
 
 interface UploadError {
   Error?: Error;
@@ -100,16 +100,14 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
           Prefix: inputs.target,
           StartAfter: startAfter
         }).promise();
+        const contents: ObjectList = objects.Contents ?? [];
 
         const deleteObjects: ObjectIdentifierList = [];
-        for (const content of objects.Contents ?? []) {
-          if (content?.Key != null) {
-            startAfter = content.Key;
-            if (!keys.includes(content.Key)) {
-              deleteObjects.push({
-                Key: content.Key
-              });
-            }
+        for (const content of contents) {
+          if (content?.Key != null && !keys.includes(content.Key)) {
+            deleteObjects.push({
+              Key: content.Key
+            });
           }
         }
 
@@ -125,7 +123,14 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
         for (const value of deleteResult.Errors ?? []) {
           core.info(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
         }
-      } while (startAfter != null && objects?.MaxKeys != null && objects?.KeyCount === objects?.MaxKeys);
+
+        if (objects.MaxKeys != null &&
+          objects.MaxKeys === objects.KeyCount &&
+          objects.KeyCount === contents.length &&
+          contents.length > 0) {
+          startAfter = contents[contents.length - 1].Key;
+        }
+      } while (startAfter != null);
     }
 
     setOutputs(outputs);
