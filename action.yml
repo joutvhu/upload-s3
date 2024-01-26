@@ -16,10 +16,11 @@ inputs:
     required: true
   source:
     description: The local directory (or file) you wish to upload to S3.
-    required: true
+    required: false
+    default: '.'
   target:
     description: The directory (or file path) on the bucket to upload files.
-    required: true
+    required: false
     default: ''
   acl:
     description: The canned ACL to apply to the object

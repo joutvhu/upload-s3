@@ -128,7 +128,7 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
           objects.MaxKeys === objects.KeyCount &&
           objects.KeyCount === contents.length &&
           contents.length > 0) {
-          startAfter = contents[contents.length - 1].Key;
+          startAfter = objects.Contents?.at(-1)?.Key;
         }
       } while (startAfter != null);
     }
