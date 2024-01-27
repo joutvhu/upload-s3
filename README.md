@@ -1,4 +1,4 @@
-# S3 Upload
+# Upload S3
 
 GitHub action to upload files to Amazon S3.
 
