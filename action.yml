@@ -23,7 +23,7 @@ inputs:
     required: false
     default: ''
   acl:
-    description: The canned ACL to apply to the object
+    description: The canned ACL to apply to the objects.
     required: false
     default: private
   expires:
@@ -33,7 +33,7 @@ inputs:
     description: Delete files not present at local.
     required: false
   ignore_error:
-    description: Should failed uploads be ignored
+    description: Should failed uploads be ignored.
     required: false
     default: 'true'
 outputs:
