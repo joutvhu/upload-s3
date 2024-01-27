@@ -1,4 +1,4 @@
-name: Upload AWS S3
+name: Upload S3 Bucket
 description: GitHub action to upload files to Amazon S3
 author: Giao Ho
 inputs:
