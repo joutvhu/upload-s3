@@ -34,7 +34,8 @@ function getFiles(source: string, files: string[] = []): string[] {
 function count(results: (ManagedUpload.SendData | UploadError)[]) {
   const outputs: any = {
     succeeded: 0,
-    failed: 0
+    failed: 0,
+    deleted: 0
   };
   for (const result of results) {
     if ('Key' in result && result.Key != null) {
@@ -80,7 +81,10 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
           return value;
         })
         .catch(reason => {
-          core.error(reason);
+          if (inputs.ignoreError != true)
+            core.error(reason);
+          else
+            core.warning(reason);
           return {
             Error: reason
           };
@@ -90,10 +94,14 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
 
     const results = await Promise.all(requests);
     const outputs = count(results);
+    if (inputs.ignoreError != true && outputs.failed > 0) {
+      throw new Error(`Upload ${outputs.failed} files failed`);
+    }
 
     if (inputs.delete === true) {
       let startAfter: StartAfter | undefined = undefined;
       let objects: ListObjectsV2Output | undefined;
+      core.info('Deleting files not present at local.');
       do {
         objects = await s3.listObjectsV2({
           Bucket: inputs.awsBucket,
@@ -119,9 +127,10 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
         }).promise();
         for (const value of deleteResult.Deleted ?? []) {
           core.info(`Deleted ${value.Key}`);
+          outputs.deleted++;
         }
         for (const value of deleteResult.Errors ?? []) {
-          core.info(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
+          core.warning(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
         }
 
         if (objects.MaxKeys != null &&
@@ -133,14 +142,9 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
       } while (startAfter != null);
     }
 
-    setOutputs(outputs);
-
     core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`);
-    if (inputs.ignoreError != true && outputs.failed > 0) {
-      throw new Error(`Upload ${outputs.failed} files failed`);
-    }
+    setOutputs(outputs);
   } catch (err: any) {
-    core.debug(`Error status: ${err.status}`);
     core.setFailed(err.message);
   }
 })();

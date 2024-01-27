@@ -13,5 +13,6 @@ export enum Inputs {
 
 export enum Outputs {
   Succeeded = 'succeeded',
-  Failed = 'failed'
+  Failed = 'failed',
+  Deleted = 'deleted'
 }
