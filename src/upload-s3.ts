@@ -119,18 +119,20 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
           }
         }
 
-        const deleteResult = await s3.deleteObjects({
-          Bucket: inputs.awsBucket,
-          Delete: {
-            Objects: deleteObjects
+        if (deleteObjects.length > 0) {
+          const deleteResult = await s3.deleteObjects({
+            Bucket: inputs.awsBucket,
+            Delete: {
+              Objects: deleteObjects
+            }
+          }).promise();
+          for (const value of deleteResult.Deleted ?? []) {
+            core.info(`Deleted ${value.Key}`);
+            outputs.deleted++;
           }
-        }).promise();
-        for (const value of deleteResult.Deleted ?? []) {
-          core.info(`Deleted ${value.Key}`);
-          outputs.deleted++;
-        }
-        for (const value of deleteResult.Errors ?? []) {
-          core.warning(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
+          for (const value of deleteResult.Errors ?? []) {
+            core.warning(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
+          }
         }
 
         if (objects.MaxKeys != null &&
