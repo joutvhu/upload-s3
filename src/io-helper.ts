@@ -1,7 +1,8 @@
 import * as core from '@actions/core';
 import {InputOptions} from '@actions/core';
 import {Inputs, Outputs} from './constants';
-import {Expires, ObjectCannedACL} from 'aws-sdk/clients/s3';
+
+import { ObjectCannedACL } from '@aws-sdk/client-s3';
 
 export interface S3Inputs {
   awsAccessKeyId: string;
@@ -11,7 +12,7 @@ export interface S3Inputs {
   source: string;
   target: string;
   acl?: ObjectCannedACL;
-  expires?: Expires;
+  expires?: Date;
   delete?: boolean;
   ignoreError?: boolean;
 }

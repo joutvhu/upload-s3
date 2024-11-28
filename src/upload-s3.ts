@@ -1,11 +1,17 @@
-import * as aws from 'aws-sdk';
+import {Upload} from '@aws-sdk/lib-storage';
+import {
+  CompleteMultipartUploadCommandOutput,
+  DeleteObjectsCommand,
+  ObjectIdentifier,
+  paginateListObjectsV2,
+  S3Client,
+  waitUntilObjectNotExists
+} from '@aws-sdk/client-s3';
 import * as core from '@actions/core';
 import {getInputs, S3Inputs, setOutputs} from './io-helper';
 import fs from 'fs';
 import path from 'path';
 import {lookup} from 'mime-types';
-import {ManagedUpload} from 'aws-sdk/lib/s3/managed_upload';
-import {ListObjectsV2Output, ObjectIdentifierList, ObjectList, StartAfter} from 'aws-sdk/clients/s3';
 
 interface UploadError {
   Error?: Error;
@@ -31,7 +37,7 @@ function getFiles(source: string, files: string[] = []): string[] {
   return files;
 }
 
-function count(results: (ManagedUpload.SendData | UploadError)[]) {
+function count(results: (CompleteMultipartUploadCommandOutput | UploadError)[]) {
   const outputs: any = {
     succeeded: 0,
     failed: 0,
@@ -51,31 +57,33 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
   try {
     const inputs: S3Inputs = getInputs();
 
-    aws.config.update({
+    const s3 = new S3Client({
       credentials: {
         accessKeyId: inputs.awsAccessKeyId,
         secretAccessKey: inputs.awsSecretAccessKey,
       },
-      region: inputs.awsRegion
+      region: inputs.awsRegion,
     });
-    const s3 = new aws.S3({signatureVersion: 'v4'});
 
     const keys: string[] = [];
     const files = getFiles(inputs.source);
-    const requests: Promise<ManagedUpload.SendData | UploadError>[] = [];
+    const requests: Promise<CompleteMultipartUploadCommandOutput | UploadError>[] = [];
     for (const file of files) {
       const name = path.relative(inputs.source, file);
       const key = path.join(inputs.target, name);
       const contentType = lookup(file) || 'text/plain';
       keys.push(key);
-      const request = s3.upload({
-        Bucket: inputs.awsBucket,
-        Key: key,
-        Body: fs.readFileSync(file),
-        ContentType: contentType,
-        ACL: inputs.acl,
-        Expires: inputs.expires
-      }).promise()
+      const request = new Upload({
+        client: s3,
+        params: {
+          Bucket: inputs.awsBucket,
+          Key: key,
+          Body: fs.readFileSync(file),
+          ContentType: contentType,
+          ACL: inputs.acl,
+          Expires: inputs.expires
+        },
+      }).done()
         .then(value => {
           core.info(`Uploaded ${value.Key}`);
           return value;
@@ -99,18 +107,22 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
     }
 
     if (inputs.delete === true) {
-      let startAfter: StartAfter | undefined = undefined;
-      let objects: ListObjectsV2Output | undefined;
       core.info('Deleting files not present at local.');
-      do {
-        objects = await s3.listObjectsV2({
+      const paginator = paginateListObjectsV2(
+        {
+          client: s3,
+          pageSize: 500
+        },
+        {
           Bucket: inputs.awsBucket,
-          Prefix: inputs.target,
-          StartAfter: startAfter
-        }).promise();
-        const contents: ObjectList = objects.Contents ?? [];
+          Prefix: inputs.target
+        },
+      );
 
-        const deleteObjects: ObjectIdentifierList = [];
+      for await (const page of paginator) {
+        const contents = page.Contents ?? [];
+
+        const deleteObjects: Array<ObjectIdentifier> = [];
         for (const content of contents) {
           if (content?.Key != null && !keys.includes(content.Key)) {
             deleteObjects.push({
@@ -120,12 +132,26 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
         }
 
         if (deleteObjects.length > 0) {
-          const deleteResult = await s3.deleteObjects({
-            Bucket: inputs.awsBucket,
-            Delete: {
-              Objects: deleteObjects
-            }
-          }).promise();
+          const deleteResult = await s3.send(
+            new DeleteObjectsCommand({
+              Bucket: inputs.awsBucket,
+              Delete: {
+                Objects: deleteObjects
+              },
+            }),
+          );
+          for (const key in keys) {
+            await waitUntilObjectNotExists(
+              {
+                client: s3,
+                maxWaitTime: 1800
+              },
+              {
+                Bucket: inputs.awsBucket,
+                Key: key
+              },
+            );
+          }
           for (const value of deleteResult.Deleted ?? []) {
             core.info(`Deleted ${value.Key}`);
             outputs.deleted++;
@@ -134,14 +160,7 @@ function count(results: (ManagedUpload.SendData | UploadError)[]) {
             core.warning(`Cannot delete ${value.Key}; code: ${value.Code}, message: ${value.Message}`);
           }
         }
-
-        if (objects.MaxKeys != null &&
-          objects.MaxKeys === objects.KeyCount &&
-          objects.KeyCount === contents.length &&
-          contents.length > 0) {
-          startAfter = objects.Contents?.at(-1)?.Key;
-        }
-      } while (startAfter != null);
+      }
     }
 
     core.info(`Uploaded ${outputs.succeeded} files successfully and ${outputs.failed} files failed.`);

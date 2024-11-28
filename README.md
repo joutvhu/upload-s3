@@ -22,7 +22,7 @@ See [action.yml](action.yml)
 
 ```yaml
 steps:
-  - uses: joutvhu/upload-s3@v1
+  - uses: joutvhu/upload-s3@v2
     with:
       aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
